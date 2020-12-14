@@ -1,0 +1,135 @@
+---
+title: "Forecasts of stock"
+author: "zidani"
+date: "13/12/2020"
+output: html_document
+---
+
+```{r}
+library(readr)
+library(ggplot2)
+library(forecast)
+library(fpp2)
+library(TTR)
+library(dplyr)
+library(readxl)
+library(ggfortify)
+```
+
+```{r}
+sp <- read_csv(file= "NSE All Share Data.yr12.18daily.csv")
+sp1 <- read_csv(file= "NSE All Share Data.yr19.20daily.csv")
+head(sp)
+head(sp1)
+```
+
+```{r}
+sp$Open <- NULL
+sp$High <- NULL
+sp$Low <- NULL
+sp$Vol. <- NULL
+sp$`Change %` <- NULL
+str(sp)
+sp1$Open <- NULL
+sp1$High <- NULL
+sp1$Low <- NULL
+sp1$Vol. <- NULL
+sp1$`Change %` <- NULL
+str(sp1)
+
+```
+
+
+```{r}
+sp_train <- ts(sp$Price, frequency = 365, start = c(2012,1), end = c(2019,12))
+sp_test<- ts (sp1$Price, frequency = 365, start = c(2019,12), end = c(2020, 10))
+ 
+```
+
+```{r}
+str(sp_train)
+```
+
+
+TBATS
+
+The TBATS model combines several components of the already discussed techniques in this guide, making them a very good choice for forecasting.
+
+It constitutes the following elements:
+
+T: Trigonometric terms for seasonality
+B: Box-Cox transformations for heterogeneity
+A: ARMA errors for short-term dynamics
+T: Trend
+S: Seasonal (including multiple and non-integer periods)
+
+The first line of code below creates the TBATS model and stores it in an object 'model_tbats'. The second line prints the summary and the forecasts for the next 464 days.
+
+```{r}
+model_tbats <- tbats(sp_train)
+summary(model_tbats)
+
+```
+
+
+Let us now evaluate the model performance on the test data, which is done in the lines of code below.
+
+```{r}
+for_tbats <- forecast::forecast(model_tbats, h = 464)
+sp_tbats = as.data.frame(for_tbats)
+sp1$tbats = sp_tbats$`Point Forecast`
+MAPE(sp1$Price, sp1$tbats) 
+```
+
+
+```{r}
+y1 <-for_tbats
+y2 <- 
+
+
+```
+
+```{r}
+plot(for_tbats)
+```
+
+
+```{r}
+naive_mod <- naive(sp_train, h = 365)
+summary(naive_mod)
+NROW(naive_mod)
+```
+
+```{r}
+library(MLmetrics)
+sp1$naive = 365
+MAPE(sp1$Price, sp1$naive)
+```
+
+```{r}
+plot.ts(naive_mod)
+
+```
+Simple Exponential Smoothing
+
+Exponential Smoothing methods are an extension of the naive method, wherein the forecasts are produced using weighted averages of past observations, with the weights decaying exponentially as the observations get older. In simple words, higher weights are given to the more recent observations and vice versa. The value of the smoothing parameter for the level is decided by the parameter 'alpha'.
+
+The first line of code below reads in the time series object 'sp_train' and creates the simple exponential smoothing model. The second line prints the summary of the model as well as the forecasted value for the next 464 days
+
+```{r}
+se_model <- ses(sp_train, h = 464)
+summary(se_model)
+```
+
+The output above shows that the simple exponential smoothing has the same value for all the forecasts. Because the alpha value is close to 1, the forecasts are closer to the most recent observations. Let us now evaluate the model performance on the test data.
+
+The first line of code below stores the output of the model in a data frame. The second line adds a new variable, simplexp, in the test data which contains the forecasted value from the simple exponential model. The third line uses the MAPE function to produce the MAPE error on the test data, which comes out to be 0.72 percent.
+
+```{r}
+df_sp = as.data.frame(se_model)
+sp1$simplexp = df_sp$`Point Forecast`
+MAPE(sp1$Price, sp1$simplexp)
+summary(se_model)
+```
+
+

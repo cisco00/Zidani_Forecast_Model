@@ -1,0 +1,355 @@
+---
+title: "ECONOMIC IMPACT OF THE COVID19 PANDEMIC"
+author: "Joseph O. Michael"
+date: "11/9/2020"
+output:
+  pdf_document: default
+
+---
+
+The COVID-19 pandemic has spread with alarming speed, infecting millions and bringing economic activity to a near-standstill as countries imposed tight restrictions on movement to halt the spread of the virus. As the health and human toll grows, the economic damage is already evident and represents the largest economic shock the world has experienced in decades.
+
+The outbreak of the pandemic all over the world has disturbed the political, social, economic, religious and financial structures of the whole world. World’s topmost economies such as the US, China, UK, Germany, France, Italy, Japan and many others were all at the verge of collapse. Besides, Stock Markets around the world have been pounded and oil prices have fallen off a cliff. 
+
+This analysis will focus on examining the extent to which the pandemic affect the stock market by analysing the trend in the stock price over the past decade pre-COVID-19, make a projection of what the stock price should look like during the pandemic based on historic trend, and check the variance between the predicted stock price and observed for the period of the pandemic. A TIME SERIES ANALYSIS AND FORCAST WILL BE REQUIRED FOR THIS.
+
+REF: https://ntguardian.wordpress.com/2017/03/27/introduction-stock-market-data-r-1/
+
+
+Loading Required Library
+
+```{r}
+library(readr)
+library(ggplot2)
+library(forecast)
+library(fpp2)
+library(TTR)
+library(dplyr)
+library(readxl)
+library(ggfortify)
+```
+
+
+Reading the required Data
+
+We will loading in two datasets, one is our training data the other will be our cross validation for our claim
+
+```{r}
+sp <- read_csv(file= "/Users/user/Desktop/StockData/NSE All Share Data.yr12.18daily.csv")
+sp1 <- read_csv(file= "/Users/user/Desktop/StockData/NSE All Share Data.yr19.20daily.csv")
+head(sp)
+head(sp1)
+```
+
+```{r}
+str(sp)
+```
+From the data above, we have 1,713 observations and 7 variable.For the purpose of our analysis we will need only the date and price variables to perform the time series analysis. we will drop the variables that are not required.
+
+```{r}
+sp$Open <- NULL
+sp$High <- NULL
+sp$Low <- NULL
+sp$Vol. <- NULL
+sp$`Change %` <- NULL
+str(sp)
+sp1$Open <- NULL
+sp1$High <- NULL
+sp1$Low <- NULL
+sp1$Vol. <- NULL
+sp1$`Change %` <- NULL
+str(sp1)
+
+```
+
+```{r}
+head(sp1)
+
+```
+
+We need to convert the date from factor to date class.
+
+```{r}
+sp$Date <- as.Date(sp$Date, format = "%B %d, %Y")
+str(sp)
+```
+
+```{r}
+
+sp1$Date <- as.Date(sp1$Date, format = "%B %d, %Y")
+str(sp1)
+```
+
+Preparing the Time Series Object
+
+To run the forecasting models in 'R', we need to convert the data into a time series object which is done in the first line of code below. The 'start' and 'end' argument specifies the time of the first and the last observation, respectively. The argument 'frequency' specifies the number of observations per unit of time.
+
+We will also use the Mean Absolute Percentage Error (or MAPE) from package forecast, which will be used to evaluate the performance of the forecasting models. The lower the MAPE value, the better the forecasting model. 
+
+```{r}
+sp_train <- ts(sp$Price, frequency = 365, start = c(2012,1), end = c(2019,12))
+Actual_2019_2020 <- ts (sp1$Price, frequency = 365, start = c(2019,12), end = c(2020, 10))
+ 
+```
+
+
+Evaluating  Forecasting Methods:
+
+Naive Forecasting Method
+
+The simplest forecasting method is to use the most recent observation as the forecast for the next observation. This is called a naive forecast and can be implemented using the 'naive()' function. This method may not be the best forecasting technique, but it often provides a useful benchmark for other, more advanced forecasting methods.
+
+The first line of code below reads in the time series object 'sp_train' and creates the naive forecasting model. The second argument 'h' specifies the number of values you want to forecast which is set to 365 in our case. The second line prints the summary of the model as well as the forecast value for the next 365 days.
+
+```{r}
+naive_mod <- naive(sp_train, h = 365)
+summary(naive_mod)
+NROW(naive_mod)
+```
+The output above shows that the naive method predicts the same value for the entire forecasting horizon. Let us now use the forecasted value and evaluate the model performance on the test data.
+
+The first line of code below adds a new variable, naive, in the test data which contains the forecasted value obtained from the naive method. The second line uses the mape function to produce the MAPE error on the test data, which comes out to be 0.72 percent.
+
+
+```{r}
+library(MLmetrics)
+sp1$naive = 365
+MAPE(sp1$Price, sp1$naive)
+```
+visualizing the model
+
+```{r}
+plot.ts(naive_mod)
+
+```
+
+
+Simple Exponential Smoothing
+
+Exponential Smoothing methods are an extension of the naive method, wherein the forecasts are produced using weighted averages of past observations, with the weights decaying exponentially as the observations get older. In simple words, higher weights are given to the more recent observations and vice versa. The value of the smoothing parameter for the level is decided by the parameter 'alpha'.
+
+The first line of code below reads in the time series object 'sp_train' and creates the simple exponential smoothing model. The second line prints the summary of the model as well as the forecasted value for the next 464 days
+
+```{r}
+se_model <- ses(sp_train, h = 464)
+summary(se_model)
+```
+
+The output above shows that the simple exponential smoothing has the same value for all the forecasts. Because the alpha value is close to 1, the forecasts are closer to the most recent observations. Let us now evaluate the model performance on the test data.
+
+The first line of code below stores the output of the model in a data frame. The second line adds a new variable, simplexp, in the test data which contains the forecasted value from the simple exponential model. The third line uses the MAPE function to produce the MAPE error on the test data, which comes out to be 0.72 percent.
+
+```{r}
+df_sp = as.data.frame(se_model)
+sp1$simplexp = df_sp$`Point Forecast`
+MAPE(sp1$Price, sp1$simplexp)
+summary(se_model)
+```
+Holt's Trend Method
+
+This is an extension of the simple exponential smoothing method which considers the trend component while generating forecasts. This method involves two smoothing equations, one for the level and one for the trend component.
+
+The first line of code below creates the holt's winter model and stores it in an object 'holt_model'. The second line prints the summary and the forecasts for the next 30 months.
+
+```{r}
+holt_model <- holt(sp_train, h = 464)
+summary(holt_model)
+```
+
+
+The output above shows that the MAPE for the training data is 0.71 percent. Let us now evaluate the model performance on the test data, which is done in the lines of code below. The MAPE error on the test data comes out to be 0.71 percent, which is an improvement over the previous models.
+
+```{r}
+sp_holt = as.data.frame(holt_model)
+sp1$holt = sp_holt$`Point Forecast`
+MAPE(sp1$Price, sp1$holt) 
+```
+
+```{r}
+plot.ts(sp_holt)
+```
+TBATS
+
+The TBATS model combines several components of the already discussed techniques in this guide, making them a very good choice for forecasting.
+
+It constitutes the following elements:
+
+T: Trigonometric terms for seasonality
+B: Box-Cox transformations for heterogeneity
+A: ARMA errors for short-term dynamics
+T: Trend
+S: Seasonal (including multiple and non-integer periods)
+
+The first line of code below creates the TBATS model and stores it in an object 'model_tbats'. The second line prints the summary and the forecasts for the next 464 days.
+
+```{r}
+model_tbats <- tbats(sp_train)
+summary(model_tbats)
+
+```
+
+
+Let us now evaluate the model performance on the test data, which is done in the lines of code below.
+
+```{r}
+for_tbats <- forecast::forecast(model_tbats, h = 464)
+sp_tbats = as.data.frame(for_tbats)
+sp1$tbats = sp_tbats$`Point Forecast`
+MAPE(sp1$Price, sp1$tbats) 
+```
+```{r}
+summary(for_tbats)
+```
+
+```{r}
+plot(for_tbats)
+```
+
+Conclusion
+
+The performance of the models on the test data is summarized below:
+
+Naive Method: MAPE of 0.72 percent
+Simple Exponential Smoothing: MAPE 0.72 percent
+Holt's Trend Method: MAPE of 0.71 percent
+ARIMA: MAPE of 0.68 percent
+TBATS: MAPE of 0.69 percent
+
+The Naive and Simple Exponential Smoothing, and TBATS models did well respectively but they were outperformed by Arima model producing the lower MAPE of 0.69
+
+
+
+ARIMA
+
+ARIMA modeling is one of the most popular approaches to time series forecasting. While exponential smoothing models are based on a description of the trend and seasonality in the data, ARIMA models aim to describe the auto-correlations in the data.
+
+The ‘auto.arima()’ function in 'R' is used to build ARIMA models by using a variation of the Hyndman-Khandakar algorithm, which combines unit root tests, minimisation of the AICc, and MLE to obtain an ARIMA model.
+
+The first line of code below creates the ARIMA model and stores it in an object 'arima_model'. The second line prints the summary
+
+```{r}
+arima_model <- auto.arima(sp_train)
+summary(arima_model)
+```
+
+The output above shows that the MAPE for the training data is 0.69 percent. Let us now evaluate the model performance on the test data, which is done in the lines of code below. The MAPE error on the test data comes out to be 0.12 percent, which is an improvement over all the previous models.
+
+
+```{r}
+fore_arima = forecast::forecast(arima_model, h=464)
+df_arima = as.data.frame(fore_arima)
+sp1$arima = df_arima$`Point Forecast`
+MAPE(sp1$Price, sp1$arima)
+```
+```{r}
+summary(fore_arima)
+```
+
+Fitting the Model:
+
+Optimum ARIMA
+```{r}
+fit <- arima((sp_train), c(2, 1, 0), seasonal = list(order =c(2, 1, 0), period =5 ))
+
+```
+
+Apply the seasonal random trend model to our time series: assuming the trend is just a random walk without any seasonality.
+```{r}
+fit1 <- arima((sp_train), c(0, 1, 0), seasonal = list(order =c(0,1, 0), period =365 ))
+
+```
+
+Predicting a year ahead
+```{r}
+pred <- predict(fit, n.ahead =365 )
+```
+
+```{r}
+pred1 <- predict(fit1, n.ahead = 365)
+
+```
+
+Visualizing Analysis and forecast(Optimum Arima)
+```{r}
+ts.plot(sp_train, pred$pred, log= "y",lty = c(1,3))
+```
+Visualizing Analysis and forecast(non-seasonal arima)
+```{r}
+ts.plot(sp_train, pred1$pred, log= "y",lty = c(1,3))
+```
+
+Visualizing  Actual Oservations Against forecasted values(Optimum arima)
+
+```{r}
+autoplot(ts( cbind(pred$pred, Actual_2019_2020), start = c(2020), frequency = 365 ),
+         facets = FALSE)
+
+```
+
+Visualizing  Actual Oservations Against forecasted values(non-seasonal arima)
+
+```{r}
+autoplot(ts( cbind(pred1$pred, Actual_2019_2020), start = c(2020), frequency = 365 ),
+         facets = FALSE)
+
+```
+
+```{r}
+# = forecast::forecast(arima_model, h=464)
+#df_arima = as.data.frame(fore_arima)
+#sp1$arima = df_arima$`Point Forecast`
+MAPE(Actual_2019_2020, pred$pred) 
+```
+```{r}
+MAPE(Actual_2019_2020, pred1$pred)
+
+```
+
+
+Validating Our model
+
+```{r}
+datasize <- length(sp_train)
+valsize <-  60
+```
+
+Forecasting One step ahead
+```{r}
+one_step_ahead_sarima = matrix(ncol = 0, nrow = datasize)
+one_step_ahead_sarima[1:(datasize-valsize)] = sp_train[1:(datasize-valsize)]
+# one_step_ahead_sarima[1:datasize] = sp_train[1:datasize] # for continuous prediction
+
+for(i in 1:valsize){
+  training_observed = sp_train[1:(datasize-valsize+i-1)]
+  # training_observed = one_step_ahead_sarima[1:(datasize-valsize+i-1)] # for continuous forecast
+  forecasted.sarima = sarima.for(training_observed, n.ahead=1, p=2, d=1, q=2)
+  
+  one_step_ahead_sarima[(datasize-valsize+i)] = forecasted.sarima$pred
+}
+
+ MAPE(sp_train[(datasize-valsize+1):datasize],
+     one_step_ahead_sarima[(datasize-valsize+1):datasize])*100
+```
+
+
+```{r}
+
+x<- sp_train[(datasize-valsize+1):datasize]
+y<- one_step_ahead_sarima[(datasize-valsize+1):datasize]
+
+```
+
+```{r}
+autoplot(ts(cbind(x, y)), facets = FALSE)
+```
+
+
+```{r}
+
+plot(x, col= "blue", xlab="Year", ylab= " ", main="SARIMA forecast", type = "l", lwd=1)
+points(y, col="red", type = "l", lwd=1)
+
+```
+
+
+A general analysis of the NSE all share price reveals that the stock market seems to be very volatile which will make t difficult for any model to predict with a high degree of accuracy, the dataset assumes a non seasonal random walk nature. sociopolitical and economic factors within the country and the global environment accounts for such level of volatility. From the chart above, it is obvious that the COVID19 pandemic has a devastating effect on the stock market considering the large margin between the predicted and actual figures as represented in the chart.
